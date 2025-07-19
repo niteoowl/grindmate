@@ -227,7 +227,8 @@
     <!-- Message Box for alerts -->
     <div id="messageBox" class="message-box">
         <p id="messageText"></p>
-        <button onclick="hideMessageBox()">확인</button>
+        <!-- FIX: Added id="messageBoxConfirmButton" to the button -->
+        <button id="messageBoxConfirmButton" onclick="hideMessageBox()">확인</button>
     </div>
 
     <script type="module">
@@ -269,12 +270,12 @@
             characterLevelEl, expTextEl, characterGoldEl,
             gameIdDisplay, currentTurnDisplay, blackPlayerDisplay, whitePlayerDisplay, gameStatusDisplay,
             resetGameButton, leaveGameButton,
-            messageBox, messageText, messageBoxConfirmButton
+            messageBox, messageText, messageBoxConfirmButton // messageBoxConfirmButton 추가
         ] = [
             'character-level', 'exp-text', 'character-gold',
             'gameIdDisplay', 'currentTurnDisplay', 'blackPlayerDisplay', 'whitePlayerDisplay', 'gameStatusDisplay',
             'resetGameButton', 'leaveGameButton',
-            'messageBox', 'messageText', 'messageBoxConfirmButton'
+            'messageBox', 'messageText', 'messageBoxConfirmButton' // messageBoxConfirmButton ID 추가
         ].map(id => document.getElementById(id));
 
         // Dummy character data for top bar display
@@ -362,7 +363,9 @@
         };
 
         // Game ID (for testing, in a real app this would come from URL params or game creation)
-        const TEST_GAME_ID = "testOmokGame123"; // Replace with a dynamic ID in a real app
+        // FIX: Get gameId from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const GAME_ID = urlParams.get('gameId') || "defaultOmokGame"; // Use a default if no gameId in URL
 
         // Setup Firestore listener for game data
         const setupGameListener = async () => {
@@ -371,20 +374,24 @@
                 return;
             }
 
-            gameRef = doc(db, `artifacts/${appId}/public/data/games`, TEST_GAME_ID);
+            gameRef = doc(db, `artifacts/${appId}/public/data/games`, GAME_ID);
 
             onSnapshot(gameRef, (docSnap) => {
                 if (docSnap.exists()) {
                     gameData = docSnap.data();
-                    board = gameData.board;
+                    // FIX: Parse the board string back to a 2D array
+                    board = JSON.parse(gameData.board);
                     currentPlayer = gameData.currentPlayer;
                     players = gameData.players;
                     gameStatus = gameData.status;
                     updateGameUI();
                     redrawStones(); // Redraw board on every update
                 } else {
-                    console.log("No such game document! Creating a new one for testing.");
-                    initializeNewGame(TEST_GAME_ID);
+                    console.log(`No game document found for ID: ${GAME_ID}. Attempting to join or create.`);
+                    // If game doesn't exist, try to create or join.
+                    // For this play screen, we assume the game is already created.
+                    // A more robust solution would redirect to a lobby/create page.
+                    showMessageBox(`게임 ID "${GAME_ID}"를 찾을 수 없습니다. 게임 생성 또는 참가 화면으로 돌아가세요.`);
                 }
             }, (error) => {
                 console.error("Error listening to game data:", error);
@@ -393,6 +400,7 @@
         };
 
         // Initialize a new game in Firestore if it doesn't exist
+        // This function is primarily for the 'create game' page, but kept here for completeness
         const initializeNewGame = async (gameId) => {
             if (!isAuthReady || !userId) return;
 
@@ -409,7 +417,8 @@
                     createdBy: userId,
                     status: "waiting",
                     players: initialPlayers,
-                    board: initialBoard,
+                    // FIX: Stringify the board array before saving
+                    board: JSON.stringify(initialBoard),
                     moves: [],
                     currentPlayer: "black"
                 });
@@ -422,7 +431,7 @@
 
         // Update game information UI
         const updateGameUI = () => {
-            gameIdDisplay.textContent = TEST_GAME_ID;
+            gameIdDisplay.textContent = GAME_ID; // Use the actual GAME_ID
             currentTurnDisplay.textContent = currentPlayer === 'black' ? '흑돌' : '백돌';
             gameStatusDisplay.textContent = gameStatus === 'waiting' ? '상대방 대기 중' : (gameStatus === 'playing' ? '게임 진행 중' : '게임 종료');
 
@@ -431,6 +440,27 @@
 
             blackPlayerDisplay.textContent = blackPlayer ? blackPlayer.displayName : '없음';
             whitePlayerDisplay.textContent = whitePlayer ? whitePlayer.displayName : '없음';
+
+            // Logic to add current user to players if not already present, and update game status
+            if (isAuthReady && userId && gameData && gameStatus === 'waiting') {
+                const existingPlayer = players.find(p => p.userId === userId);
+                if (!existingPlayer) {
+                    let playerColor = 'black'; // Default to black
+                    if (players.length === 1 && players[0].color === 'black') {
+                        playerColor = 'white'; // If black is taken, become white
+                    } else if (players.length === 1 && players[0].color === 'white') {
+                        playerColor = 'black'; // If white is taken, become black (shouldn't happen with initial black)
+                    } else if (players.length === 2) {
+                        // Game is full, this user cannot join as a player
+                        showMessageBox("게임이 이미 가득 찼습니다. 관전자로 참여합니다.");
+                        // Optionally, set a spectator role or redirect
+                        return;
+                    }
+
+                    const updatedPlayers = [...players, { userId: userId, displayName: `플레이어 ${userId.substring(0, 4)}`, color: playerColor }];
+                    updateDoc(gameRef, { players: updatedPlayers });
+                }
+            }
 
             // If only one player, set status to waiting
             if (players.length < 2 && gameStatus === 'playing') {
@@ -447,6 +477,8 @@
         // Function to draw a stone with radial gradient and shadow for realistic texture
         function drawStone(x, y, color) {
             ctx.beginPath();
+            // Calculate stone radius based on cell size
+            const stoneRadius = Math.min(canvas.width / boardSize, canvas.height / boardSize) * 0.4; // Adjusted for better fit
             ctx.arc(x, y, stoneRadius, 0, Math.PI * 2, false);
 
             let gradient;
@@ -603,7 +635,8 @@
                 // Update Firestore
                 try {
                     await updateDoc(gameRef, {
-                        board: board,
+                        // FIX: Stringify the board array before updating
+                        board: JSON.stringify(board),
                         currentPlayer: nextPlayerColor,
                         status: updatedStatus,
                         moves: [...gameData.moves, { row, col, player: currentPlayerColor, timestamp: serverTimestamp() }]
@@ -649,8 +682,9 @@
             if (!confirmReset) return;
 
             try {
+                // FIX: Stringify the board array before resetting
                 await updateDoc(gameRef, {
-                    board: Array(boardSize).fill(0).map(() => Array(boardSize).fill(0)),
+                    board: JSON.stringify(Array(boardSize).fill(0).map(() => Array(boardSize).fill(0))),
                     currentPlayer: "black",
                     status: "waiting", // Reset to waiting for players
                     moves: [],
