@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오목 플레이 화면</title>
+    <!-- Galmuri 폰트 로드 -->
+    <link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/galmuri@latest/dist/galmuri.css">
+    <!-- Font Awesome 아이콘 라이브러리 로드 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Tone.js CDN for sound effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <style>
+        /* Custom CSS for background image and overall styling */
+        body {
+            /* Set the background image using the provided URL */
+            background-image: url('https://i.postimg.cc/8k9VyNqq/2025-07-19-164746.png');
+            /* Cover the entire background */
+            background-size: cover;
+            /* Fix the background image so it doesn't scroll with content */
+            background-attachment: fixed;
+            /* Center the background image */
+            background-position: center;
+            /* Set minimum height to ensure the background covers the whole viewport */
+            min-height: 100vh;
+            /* Use Galmuri font for better readability */
+            font-family: 'Galmuri11', sans-serif;
+            /* Flexbox for centering content */
+            display: flex;
+            flex-direction: column; /* Allow content to stack vertically */
+            justify-content: center;
+            align-items: center;
+            /* Default text color */
+            color: #333;
+            margin: 0;
+            padding: 20px; /* Add some padding around the content */
+            box-sizing: border-box;
+        }
+
+        /* Apply rounded corners to all elements */
+        * {
+            border-radius: 0.5rem; /* Default rounded corners */
+        }
+
+        /* Top Bar for game info (similar to previous screens) */
+        .top-bar {
+            width: 480px; /* Fixed width for consistency */
+            max-width: 100%; /* Ensure responsiveness */
+            height: 60px; background-color: #000; padding: 0 20px; box-sizing: border-box;
+            display: flex; justify-content: space-between; align-items: center; color: white;
+            border-radius: 0; font-size: 0.9em; margin-bottom: 20px; /* Space below top bar */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        .game-info-top { display: flex; align-items: center; gap: 15px; }
+        .game-info-item {
+            display: flex; align-items: center; background-color: rgba(255, 255, 255, 0.1);
+            padding: 4px 8px; border-radius: 0; font-weight: bold; font-size: 0.85em;
+            border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+        }
+        .game-info-item.level, .game-info-item.gold { color: #FFD700; }
+        .game-info-item.exp { color: #7FFF00; }
+        .icon { margin-right: 5px; font-size: 1.1em; }
+
+
+        /* Container for the board and canvas to manage their overlapping */
+        .board-container {
+            position: relative; /* Allows absolute positioning of children */
+            width: 480px; /* Fixed width for the board area */
+            height: 480px; /* Fixed height for the board area */
+            max-width: 90vw; /* Responsive width */
+            max-height: 90vw; /* Responsive height, maintain aspect ratio */
+            aspect-ratio: 1 / 1; /* Maintain square aspect ratio */
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6); /* Shadow for the board */
+            display: flex; /* Use flex to center image/canvas if needed */
+            justify-content: center;
+            align-items: center;
+            border-radius: 0.5rem;
+            overflow: hidden; /* Ensures content stays within rounded corners */
+            margin-bottom: 20px; /* Space below the board */
+        }
+
+        /* Style for the large central image (chessboard) */
+        .chessboard-image {
+            width: 100%; /* Fill the container */
+            height: 100%; /* Fill the container */
+            object-fit: contain; /* Ensure the image fits without cropping */
+            display: block; /* Remove extra space below image */
+            border-radius: 0.5rem;
+        }
+
+        /* Style for the canvas overlay */
+        .board-canvas {
+            position: absolute; /* Position over the image */
+            top: 0;
+            left: 0;
+            width: 100%; /* Match image width */
+            height: 100%; /* Match image height */
+            background-color: transparent; /* Make canvas transparent */
+            border-radius: 0.5rem;
+            cursor: pointer; /* Indicate interactivity */
+        }
+
+        /* Panel for game controls and info */
+        .panel {
+            background-color: rgba(255, 255, 255, 0.9); border-radius: 0.5rem; padding: 20px;
+            margin-bottom: 20px; border: 2px solid #555; box-shadow: 4px 4px 0px #333; color: #333;
+            width: 480px; /* Fixed width for consistency */
+            max-width: 100%; /* Ensure responsiveness */
+            box-sizing: border-box;
+        }
+        .panel h2 {
+            font-size: 1.3em; color: #000; margin-top: 0; margin-bottom: 15px;
+            border-bottom: 2px solid #eee; padding-bottom: 5px; display: flex; align-items: center;
+        }
+        .game-info-display p {
+            margin-bottom: 8px;
+            font-size: 1em;
+            color: #555;
+        }
+        .game-info-display p span {
+            font-weight: bold;
+            color: #000;
+        }
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        /* Common Button Style */
+        .pixel-button {
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 12px 20px; border: none; border-radius: 0; font-size: 1.1em;
+            font-weight: bold; cursor: pointer; transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
+            color: white; text-shadow: 1px 1px 0px rgba(0,0,0,0.5); position: relative;
+        }
+        .pixel-button:hover { transform: translate(0, -2px); box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.6); }
+        .pixel-button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5); }
+        .pixel-button:disabled { background-color: #888; box-shadow: 4px 4px 0px #666; cursor: not-allowed; }
+
+        /* Button Colors */
+        .back-button { background-color: #6c757d; box-shadow: 4px 4px 0px #5a6268; }
+        .primary-button { background-color: #007bff; box-shadow: 4px 4px 0px #0056b3; }
+        .danger-button { background-color: #dc3545; box-shadow: 4px 4px 0px #bd2130; }
+
+
+        /* Message box styling (for custom alerts) */
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1000;
+            display: none; /* Hidden by default */
+            text-align: center;
+            font-size: 1.2rem;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+            max-width: 90vw;
+            box-sizing: border-box;
+        }
+
+        .message-box button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 15px;
+            font-size: 1rem;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 500px) {
+            .top-bar, .board-container, .panel {
+                width: 100%;
+                padding: 10px;
+            }
+            .top-bar {
+                padding: 0 10px;
+            }
+            body {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <span style="font-weight: bold;">오목</span>
+        <div class="game-info-top">
+            <div class="game-info-item level"><i class="fas fa-star icon"></i>LV.<span id="character-level">1</span></div>
+            <div class="game-info-item exp"><i class="fas fa-bolt icon"></i><span id="exp-text">0/100</span> EXP</div>
+            <div class="game-info-item gold"><i class="fas fa-coins icon"></i><span id="character-gold">0</span>골드</div>
+        </div>
+    </div>
+
+    <!-- Container for the chessboard image and the canvas -->
+    <div class="board-container">
+        <!-- Chessboard image -->
+        <img id="chessboardImage" src="https://i.postimg.cc/TP6MsNyV/3-waifu2x-photo-noise1-sc.png" alt="바둑판 이미지" class="chessboard-image">
+        <!-- Canvas for drawing stones -->
+        <canvas id="goBoardCanvas" class="board-canvas"></canvas>
+    </div>
+
+    <!-- Panel for game controls and info -->
+    <div class="game-controls-panel panel">
+        <h2><i class="fas fa-info-circle icon"></i>게임 정보</h2>
+        <div class="game-info-display">
+            <p>게임 ID: <span id="gameIdDisplay">로딩 중...</span></p>
+            <p>현재 턴: <span id="currentTurnDisplay">로딩 중...</span></p>
+            <p>흑돌 플레이어: <span id="blackPlayerDisplay">로딩 중...</span></p>
+            <p>백돌 플레이어: <span id="whitePlayerDisplay">로딩 중...</span></p>
+            <p>게임 상태: <span id="gameStatusDisplay">로딩 중...</span></p>
+        </div>
+        <div class="button-group">
+            <button id="resetGameButton" class="pixel-button danger-button"><i class="fas fa-redo icon"></i>게임 초기화</button>
+            <button id="leaveGameButton" class="pixel-button back-button"><i class="fas fa-door-open icon"></i>게임 나가기</button>
+        </div>
+    </div>
+
+    <!-- Message Box for alerts -->
+    <div id="messageBox" class="message-box">
+        <p id="messageText"></p>
+        <button onclick="hideMessageBox()">확인</button>
+    </div>
+
+    <script type="module">
+        // Firebase SDK imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables for Firebase config
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = {
+            apiKey: "AIzaSyALUv0zMoBExmhZJd2idSfmB_-DbPAAdL8",
+            authDomain: "grind-mate-a.firebaseapp.com",
+            projectId: "grind-mate-a",
+            storageBucket: "grind-mate-a.firebasestorage.app",
+            messagingSenderId: "704910171892",
+            appId: "1:704910171892:web:908b2b625e46aa7a5e48a1",
+            measurementId: "G-WQH66CMVP1"
+        };
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app, db, auth, userId = null, isAuthReady = false;
+        let gameRef = null; // Reference to the current game document in Firestore
+        let gameData = null; // Local copy of game data from Firestore
+
+        // Game State Variables (initialized with defaults, will be overwritten by Firestore)
+        const boardSize = 19; // Omok board is typically 19x19
+        let board = Array(boardSize).fill(0).map(() => Array(boardSize).fill(0)); // 0: empty, 1: black, 2: white
+        let currentPlayer = 'black'; // 'black' or 'white'
+        let players = []; // [{ userId, displayName, color }]
+        let gameStatus = 'waiting'; // 'waiting', 'playing', 'finished'
+
+        // UI Elements
+        const canvas = document.getElementById('goBoardCanvas');
+        const ctx = canvas.getContext('2d');
+        const chessboardImage = document.getElementById('chessboardImage');
+
+        const [
+            characterLevelEl, expTextEl, characterGoldEl,
+            gameIdDisplay, currentTurnDisplay, blackPlayerDisplay, whitePlayerDisplay, gameStatusDisplay,
+            resetGameButton, leaveGameButton,
+            messageBox, messageText, messageBoxConfirmButton
+        ] = [
+            'character-level', 'exp-text', 'character-gold',
+            'gameIdDisplay', 'currentTurnDisplay', 'blackPlayerDisplay', 'whitePlayerDisplay', 'gameStatusDisplay',
+            'resetGameButton', 'leaveGameButton',
+            'messageBox', 'messageText', 'messageBoxConfirmButton'
+        ].map(id => document.getElementById(id));
+
+        // Dummy character data for top bar display
+        let character = { level: 1, exp: 0, expToNextLevel: 100, gold: 0 };
+
+        // Tone.js for sound effects
+        const noise = new Tone.NoiseSynth({
+            noise: { type: 'brown', playbackRate: 2 },
+            envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.05 },
+            filter: { Q: 2, type: 'bandpass', frequency: 600 },
+        }).toDestination();
+
+        // Function to play stone placement sound
+        async function playStoneSound() {
+            await Tone.start(); // Ensure audio context is started
+            noise.triggerAttackRelease('16n');
+        }
+
+        // Custom message box functions
+        function showMessageBox(message) {
+            messageText.innerText = message;
+            messageBox.style.display = 'block';
+        }
+
+        function hideMessageBox() {
+            messageBox.style.display = 'none';
+        }
+
+        // Firebase Initialization and Authentication
+        const initializeFirebase = async () => {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        // Load dummy character data for top bar
+                        updateCharacterUI();
+                        // Attempt to load game data
+                        await setupGameListener();
+                    } else {
+                        try {
+                            if (initialAuthToken) {
+                                await signInWithCustomToken(auth, initialAuthToken);
+                            } else {
+                                await signInAnonymously(auth);
+                            }
+                        } catch (authError) {
+                            console.error("Authentication attempt failed:", authError);
+                            if (authError.code === 'auth/custom-token-mismatch') {
+                                console.warn("Custom token mismatch, attempting anonymous sign-in as fallback.");
+                                try {
+                                    await signInAnonymously(auth);
+                                } catch (anonError) {
+                                    console.error("Anonymous sign-in also failed:", anonError);
+                                    if (anonError.code === 'auth/admin-restricted-operation') {
+                                        showMessageBox("인증 오류: Firebase 콘솔에서 '인증' -> '로그인 방법'으로 이동하여 '익명' 로그인 공급자를 활성화했는지 확인해주세요.");
+                                    } else {
+                                        showMessageBox(`익명 로그인 중 알 수 없는 오류가 발생했습니다: ${anonError.message}`);
+                                    }
+                                }
+                            } else if (authError.code === 'auth/admin-restricted-operation') {
+                                showMessageBox("인증 오류: Firebase 콘솔에서 '인증' -> '로그인 방법'으로 이동하여 '익명' 로그인 공급자를 활성화했는지 확인해주세요.");
+                            } else {
+                                showMessageBox(`로그인 중 알 수 없는 오류가 발생했습니다: ${authError.message}`);
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase init failed:", error);
+                showMessageBox(`Firebase 초기화 중 오류가 발생했습니다: ${error.message}`);
+                updateCharacterUI();
+            }
+        };
+
+        // Function to update character UI (top bar)
+        const updateCharacterUI = () => {
+            characterLevelEl.textContent = character.level;
+            expTextEl.textContent = `${character.exp}/${character.expToNextLevel}`;
+            characterGoldEl.textContent = character.gold;
+        };
+
+        // Game ID (for testing, in a real app this would come from URL params or game creation)
+        const TEST_GAME_ID = "testOmokGame123"; // Replace with a dynamic ID in a real app
+
+        // Setup Firestore listener for game data
+        const setupGameListener = async () => {
+            if (!isAuthReady || !userId) {
+                console.warn("Firebase not ready or userId not set. Cannot set up game listener.");
+                return;
+            }
+
+            gameRef = doc(db, `artifacts/${appId}/public/data/games`, TEST_GAME_ID);
+
+            onSnapshot(gameRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    gameData = docSnap.data();
+                    board = gameData.board;
+                    currentPlayer = gameData.currentPlayer;
+                    players = gameData.players;
+                    gameStatus = gameData.status;
+                    updateGameUI();
+                    redrawStones(); // Redraw board on every update
+                } else {
+                    console.log("No such game document! Creating a new one for testing.");
+                    initializeNewGame(TEST_GAME_ID);
+                }
+            }, (error) => {
+                console.error("Error listening to game data:", error);
+                showMessageBox(`게임 데이터 로드 중 오류 발생: ${error.message}`);
+            });
+        };
+
+        // Initialize a new game in Firestore if it doesn't exist
+        const initializeNewGame = async (gameId) => {
+            if (!isAuthReady || !userId) return;
+
+            const initialBoard = Array(boardSize).fill(0).map(() => Array(boardSize).fill(0));
+            const initialPlayers = [{ userId: userId, displayName: `플레이어 ${userId.substring(0, 4)}`, color: "black" }];
+
+            try {
+                await setDoc(doc(db, `artifacts/${appId}/public/data/games`, gameId), {
+                    gameName: "테스트 오목 게임",
+                    timeLimit: 10,
+                    isPrivate: false,
+                    password: null,
+                    createdAt: serverTimestamp(),
+                    createdBy: userId,
+                    status: "waiting",
+                    players: initialPlayers,
+                    board: initialBoard,
+                    moves: [],
+                    currentPlayer: "black"
+                });
+                console.log(`Game ${gameId} initialized successfully.`);
+            } catch (error) {
+                console.error("Error initializing new game:", error);
+                showMessageBox(`새 게임 초기화 중 오류 발생: ${error.message}`);
+            }
+        };
+
+        // Update game information UI
+        const updateGameUI = () => {
+            gameIdDisplay.textContent = TEST_GAME_ID;
+            currentTurnDisplay.textContent = currentPlayer === 'black' ? '흑돌' : '백돌';
+            gameStatusDisplay.textContent = gameStatus === 'waiting' ? '상대방 대기 중' : (gameStatus === 'playing' ? '게임 진행 중' : '게임 종료');
+
+            const blackPlayer = players.find(p => p.color === 'black');
+            const whitePlayer = players.find(p => p.color === 'white');
+
+            blackPlayerDisplay.textContent = blackPlayer ? blackPlayer.displayName : '없음';
+            whitePlayerDisplay.textContent = whitePlayer ? whitePlayer.displayName : '없음';
+
+            // If only one player, set status to waiting
+            if (players.length < 2 && gameStatus === 'playing') {
+                gameStatus = 'waiting';
+                gameStatusDisplay.textContent = '상대방 대기 중';
+            } else if (players.length === 2 && gameStatus === 'waiting') {
+                gameStatus = 'playing';
+                gameStatusDisplay.textContent = '게임 진행 중';
+                // Update Firestore to reflect status change
+                updateDoc(gameRef, { status: 'playing' });
+            }
+        };
+
+        // Function to draw a stone with radial gradient and shadow for realistic texture
+        function drawStone(x, y, color) {
+            ctx.beginPath();
+            ctx.arc(x, y, stoneRadius, 0, Math.PI * 2, false);
+
+            let gradient;
+            if (color === 'black') {
+                gradient = ctx.createRadialGradient(
+                    x - stoneRadius * 0.3, y - stoneRadius * 0.3, stoneRadius * 0.1,
+                    x, y, stoneRadius * 1.0
+                );
+                gradient.addColorStop(0, '#444444');
+                gradient.addColorStop(1, '#000000');
+            } else {
+                gradient = ctx.createRadialGradient(
+                    x - stoneRadius * 0.3, y - stoneRadius * 0.3, stoneRadius * 0.1,
+                    x, y, stoneRadius * 1.0
+                );
+                gradient.addColorStop(0, '#FFFFFF');
+                gradient.addColorStop(1, '#CCCCCC');
+            }
+            ctx.fillStyle = gradient;
+
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 5;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+
+            ctx.fill();
+
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+
+            ctx.closePath();
+        }
+
+        // Function to redraw all stones based on the 'board' array
+        function redrawStones() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+
+            // Calculate grid properties based on current canvas dimensions
+            const marginX = canvas.width * 0.04;
+            const topMarginY = canvas.height * 0.03;
+            const bottomMarginY = canvas.height * 0.04;
+
+            const playableWidth = canvas.width - (2 * marginX);
+            const playableHeight = canvas.height - (topMarginY + bottomMarginY);
+
+            const cellWidth = playableWidth / (boardSize - 1);
+            const cellHeight = playableHeight / (boardSize - 1);
+
+            for (let r = 0; r < boardSize; r++) {
+                for (let c = 0; c < boardSize; c++) {
+                    const stoneColorValue = board[r][c];
+                    if (stoneColorValue !== 0) {
+                        const x = c * cellWidth + marginX;
+                        const y = r * cellHeight + topMarginY;
+                        drawStone(x, y, stoneColorValue === 1 ? 'black' : 'white');
+                    }
+                }
+            }
+        }
+
+        // Check for 5 consecutive stones (win condition)
+        function checkWin(row, col, playerColorValue) {
+            const directions = [
+                { dr: 0, dc: 1 },  // Horizontal
+                { dr: 1, dc: 0 },  // Vertical
+                { dr: 1, dc: 1 },  // Diagonal \
+                { dr: 1, dc: -1 }  // Diagonal /
+            ];
+
+            for (const { dr, dc } of directions) {
+                let count = 1;
+                // Check in one direction
+                for (let i = 1; i < 5; i++) {
+                    const r = row + dr * i;
+                    const c = col + dc * i;
+                    if (r >= 0 && r < boardSize && c >= 0 && c < boardSize && board[r][c] === playerColorValue) {
+                        count++;
+                    } else {
+                        break;
+                    }
+                }
+                // Check in the opposite direction
+                for (let i = 1; i < 5; i++) {
+                    const r = row - dr * i;
+                    const c = col - dc * i;
+                    if (r >= 0 && r < boardSize && c >= 0 && c < boardSize && board[r][c] === playerColorValue) {
+                        count++;
+                    } else {
+                        break;
+                    }
+                }
+
+                if (count >= 5) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Handle canvas click for stone placement
+        canvas.addEventListener('click', async function(event) {
+            if (!isAuthReady || !userId || gameStatus !== 'playing') {
+                showMessageBox("게임이 진행 중이 아닙니다.");
+                return;
+            }
+
+            const currentPlayerColor = gameData.currentPlayer;
+            const playerColorValue = currentPlayerColor === 'black' ? 1 : 2;
+
+            // Check if it's current user's turn
+            const localPlayer = players.find(p => p.userId === userId);
+            if (!localPlayer || localPlayer.color !== currentPlayerColor) {
+                showMessageBox("당신의 턴이 아닙니다.");
+                return;
+            }
+
+            // Get click coordinates relative to the canvas
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+
+            // Calculate grid properties based on current canvas dimensions
+            const marginX = canvas.width * 0.04;
+            const topMarginY = canvas.height * 0.03;
+            const bottomMarginY = canvas.height * 0.04;
+
+            const playableWidth = canvas.width - (2 * marginX);
+            const playableHeight = canvas.height - (topMarginY + bottomMarginY);
+
+            const cellWidth = playableWidth / (boardSize - 1);
+            const cellHeight = playableHeight / (boardSize - 1);
+
+            // Calculate the closest grid intersection point (row, col)
+            const col = Math.round((mouseX - marginX) / cellWidth);
+            const row = Math.round((mouseY - topMarginY) / cellHeight);
+
+            // Check if the calculated point is within the board boundaries and empty
+            if (row >= 0 && row < boardSize && col >= 0 && col < boardSize && board[row][col] === 0) {
+                // Update local board state
+                board[row][col] = playerColorValue;
+
+                // Play sound effect
+                await playStoneSound();
+
+                // Check for win
+                const hasWon = checkWin(row, col, playerColorValue);
+
+                // Prepare next turn or end game
+                const nextPlayerColor = currentPlayerColor === 'black' ? 'white' : 'black';
+                const updatedStatus = hasWon ? 'finished' : 'playing';
+
+                // Update Firestore
+                try {
+                    await updateDoc(gameRef, {
+                        board: board,
+                        currentPlayer: nextPlayerColor,
+                        status: updatedStatus,
+                        moves: [...gameData.moves, { row, col, player: currentPlayerColor, timestamp: serverTimestamp() }]
+                    });
+
+                    if (hasWon) {
+                        showMessageBox(`${currentPlayerColor === 'black' ? '흑돌' : '백돌'} 플레이어가 승리했습니다!`);
+                    }
+                } catch (error) {
+                    console.error("Error updating game state:", error);
+                    showMessageBox(`돌 놓기 실패: ${error.message}`);
+                }
+            } else if (row >= 0 && row < boardSize && col >= 0 && col < boardSize && board[row][col] !== 0) {
+                // showMessageBox("이미 돌이 놓여진 자리입니다. 다른 곳에 놓아주세요."); // Removed as per previous instruction
+            } else {
+                showMessageBox("바둑판 위에 돌을 놓아주세요.");
+            }
+        });
+
+        // Handle image load to set canvas dimensions and draw initial board
+        chessboardImage.onload = function() {
+            canvas.width = chessboardImage.offsetWidth;
+            canvas.height = chessboardImage.offsetHeight;
+            redrawStones(); // Initial draw
+        };
+
+        // Handle window resize to adjust canvas dimensions and redraw stones
+        window.addEventListener('resize', function() {
+            canvas.width = chessboardImage.offsetWidth;
+            canvas.height = chessboardImage.offsetHeight;
+            redrawStones(); // Redraw stones after resize
+        });
+
+        // Reset Game Button
+        resetGameButton.addEventListener('click', async () => {
+            if (!isAuthReady || !userId || !gameRef) {
+                showMessageBox("게임을 초기화할 수 없습니다. 로그인 또는 게임 로드 상태를 확인해주세요.");
+                return;
+            }
+
+            // Confirm reset with user
+            const confirmReset = confirm("정말로 게임을 초기화하시겠습니까? 모든 진행 상황이 사라집니다."); // Use native confirm for simplicity, can be replaced by custom modal
+            if (!confirmReset) return;
+
+            try {
+                await updateDoc(gameRef, {
+                    board: Array(boardSize).fill(0).map(() => Array(boardSize).fill(0)),
+                    currentPlayer: "black",
+                    status: "waiting", // Reset to waiting for players
+                    moves: [],
+                    // Keep existing players, or reset if needed based on game type
+                    // players: [{ userId: userId, displayName: `플레이어 ${userId.substring(0, 4)}`, color: "black" }]
+                });
+                showMessageBox("게임이 초기화되었습니다. 새로운 게임을 시작하세요!");
+            } catch (error) {
+                console.error("Error resetting game:", error);
+                showMessageBox(`게임 초기화 실패: ${error.message}`);
+            }
+        });
+
+        // Leave Game Button
+        leaveGameButton.addEventListener('click', () => {
+            showMessageBox("게임 나가기 버튼을 눌렀습니다. 실제 앱에서는 이전 화면으로 돌아가거나 게임 목록으로 이동합니다.");
+            // 여기에 실제 게임 나가기 로직을 추가합니다.
+            // 예: window.history.back() 또는 특정 페이지로 리다이렉트
+        });
+
+        // Message box close button listener
+        messageBoxConfirmButton.addEventListener('click', hideMessageBox);
+
+        // Initial call to initialize Firebase
+        window.onload = initializeFirebase;
+    </script>
+</body>
+</html>
