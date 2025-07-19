@@ -201,7 +201,7 @@
             <h3 id="modal-title"></h3>
             <p id="modal-message"></p>
             <button id="modal-action-button" class="pixel-button go-to-game-button hidden">게임으로 이동</button>
-            <button id="modal-close-button" class="modal-close-button">확인</button>
+            <button id="modal-close-button" class="pixel-button modal-close-button">확인</button>
         </div>
     </div>
 
@@ -209,7 +209,7 @@
         // Firebase SDK imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, query, where, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Global variables for Firebase config
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -256,7 +256,6 @@
                         // For now, just update the UI with dummy data
                         updateUI();
                     } else {
-                        // FIX: Added try-catch block around signInWithCustomToken to handle potential errors
                         try {
                             if (initialAuthToken) {
                                 await signInWithCustomToken(auth, initialAuthToken);
@@ -265,7 +264,6 @@
                             }
                         } catch (authError) {
                             console.error("Authentication attempt failed:", authError);
-                            // If custom token failed, try anonymous as a last resort
                             if (authError.code === 'auth/custom-token-mismatch') {
                                 console.warn("Custom token mismatch, attempting anonymous sign-in as fallback.");
                                 try {
@@ -354,7 +352,8 @@
                     createdBy: userId,
                     status: "waiting", // Game status: waiting, playing, finished
                     players: [{ userId: userId, displayName: `플레이어 ${userId.substring(0, 4)}`, color: "black" }], // Initial player
-                    board: Array(15).fill(0).map(() => Array(15).fill(0)), // Default 15x15 empty board
+                    // FIX: Stringify the board array before saving to Firestore
+                    board: JSON.stringify(Array(19).fill(0).map(() => Array(19).fill(0))), // Default 19x19 empty board
                     moves: [], // Array to store moves
                     currentPlayer: "black" // 'black' or 'white'
                 });
